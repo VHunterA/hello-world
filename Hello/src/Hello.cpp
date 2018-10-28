@@ -6,16 +6,18 @@
 // Description : Hello World in C++, Ansi-style
 //============================================================================
 
-#include <boost/lambda/lambda.hpp>
 #include <iostream>
-#include <iterator>
-#include <algorithm>
+#include <boost/asio.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 
 int main()
 {
-    using namespace boost::lambda;
-    typedef std::istream_iterator<int> in;
+	boost::asio::io_context io;
 
-    std::for_each(
-        in(std::cin), in(), std::cout << (_1 * 3) << " " );
+	boost::asio::deadline_timer t(io, boost::posix_time::seconds(10));
+	t.wait();
+
+	std::cout << "!!!Hello World!!!" << std::endl;
+
+	return 0;
 }
