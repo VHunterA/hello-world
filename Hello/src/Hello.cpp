@@ -6,10 +6,16 @@
 // Description : Hello World in C++, Ansi-style
 //============================================================================
 
+#include <boost/lambda/lambda.hpp>
 #include <iostream>
-using namespace std;
+#include <iterator>
+#include <algorithm>
 
-int main() {
-	cout << "!!!Hello World!!!" << endl; // prints !!!Hello World!!!
-	return 0;
+int main()
+{
+    using namespace boost::lambda;
+    typedef std::istream_iterator<int> in;
+
+    std::for_each(
+        in(std::cin), in(), std::cout << (_1 * 3) << " " );
 }
