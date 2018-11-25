@@ -176,12 +176,36 @@ private:
     bool _helpRequested;
 };
 
-struct Person
+struct Prime
 {
-    std::string name;
-    std::string address;
-    int         age;
+	static std::vector<int> primesList;
+    int         value;
+
+    Prime():value(0){
+
+    }
+
+    Prime& operator++(){
+    	++value;
+    	return *this;
+    }
+    Prime operator++(int){
+    	Prime p(*this);
+    	++value;
+    	return p;
+    }
+    bool isPrime(){
+    	for(int a:primesList){
+    		if( (a!=0) && (a!=1) && (value%a)==0 ){
+    			return false;
+    		}
+    	}
+    	return true;
+    }
+
 };
+
+std::vector<int> Prime::primesList;
 
 int main(int argc, char** argv)
 {
@@ -189,50 +213,51 @@ int main(int argc, char** argv)
     Poco::SQL::SQLite::Connector::registerConnector();
 
     // create a session
-    Session session("SQLite", "sample.db");
+    Session session("SQLite", "primes.db");
 
-    // drop sample table, if it exists
-    session << "DROP TABLE IF EXISTS Person", now;
+    // create table if not exists
+    session << "CREATE TABLE IF NOT EXISTS Primes (prime INTEGER)", now;
 
-    // (re)create table
-    session << "CREATE TABLE Person (Name VARCHAR(30), Address VARCHAR, Age INTEGER(3))", now;
-
-    // insert some rows
-    Person person =
-    {
-        "Bart Simpson",
-        "Springfield",
-        12
-    };
-
-    Statement insert(session);
-    insert << "INSERT INTO Person VALUES(?, ?, ?)",
-        use(person.name),
-        use(person.address),
-        use(person.age);
-
-    insert.execute();
-
-    person.name    = "Lisa Simpson";
-    person.address = "Springfield";
-    person.age     = 10;
-
-    insert.execute();
+    Prime prime;
 
     // a simple query
-    Statement select(session);
-    select << "SELECT Name, Address, Age FROM Person",
-        into(person.name),
-        into(person.address),
-        into(person.age),
+    Statement selectAll(session);
+    selectAll << "SELECT prime FROM Primes",
+        into(prime.value),
         range(0, 1); //  iterate over result set one row at a time
 
-    while (!select.done())
+    while (!selectAll.done())
     {
-        select.execute();
-        std::cout << person.name << " " << person.address << " " << person.age << std::endl;
+    	if(selectAll.execute()){
+        	Prime::primesList.push_back(prime.value);
+    	}
     }
 
-    HTTPTimeServer app;
-    return app.run(argc, argv);
+    // a simple query
+    Statement selectMax(session);
+    selectMax << "SELECT MAX(prime) FROM Primes",
+        into(prime.value),
+        range(0, 1); //  iterate over result set one row at a time
+
+    while (!selectMax.done())
+    {
+    	selectMax.execute();
+    }
+
+
+    Statement insert(session);
+    insert << "INSERT INTO Primes VALUES(?)",
+        use(prime.value);
+
+    for(int i=0;i<100;i++){
+    	++prime;
+    	if(prime.isPrime()){
+    		Prime::primesList.push_back(prime.value);
+            insert.execute();
+    	}
+    }
+
+//    HTTPTimeServer app;
+//    return app.run(argc, argv);
+    return 0;
 }
