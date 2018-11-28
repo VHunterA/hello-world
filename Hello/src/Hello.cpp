@@ -205,6 +205,21 @@ struct Prime
 
 };
 
+class KeyStrokeRunnable: public Poco::Runnable
+{
+	bool* runEncore;
+
+	virtual void run()
+	{
+		std::cin.ignore();
+		*runEncore = false;
+	}
+public:
+	KeyStrokeRunnable(bool* rE):Poco::Runnable(){
+		runEncore = rE;
+	}
+};
+
 std::vector<int> Prime::primesList;
 
 int main(int argc, char** argv)
@@ -249,13 +264,22 @@ int main(int argc, char** argv)
     insert << "INSERT INTO Primes VALUES(?)",
         use(prime.value);
 
-    for(int i=0;i<100;i++){
+    bool runEncore = true;
+
+    KeyStrokeRunnable runnable(&runEncore);
+    Poco::Thread thread;
+    thread.start(runnable);
+
+    while(runEncore){
     	++prime;
     	if(prime.isPrime()){
     		Prime::primesList.push_back(prime.value);
+    		printf("prime number found: %d\n",prime.value);
             insert.execute();
     	}
     }
+
+    thread.join();
 
 //    HTTPTimeServer app;
 //    return app.run(argc, argv);
