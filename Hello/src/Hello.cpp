@@ -208,15 +208,19 @@ struct Prime
 class KeyStrokeRunnable: public Poco::Runnable
 {
 	bool* runEncore;
+	Poco::Mutex* mx;
 
 	virtual void run()
 	{
 		std::cin.ignore();
+		mx->lock();
 		*runEncore = false;
+		mx->unlock();
 	}
 public:
-	KeyStrokeRunnable(bool* rE):Poco::Runnable(){
+	KeyStrokeRunnable(bool* rE, Poco::Mutex* m):Poco::Runnable(){
 		runEncore = rE;
+		mx = m;
 	}
 };
 
@@ -265,13 +269,20 @@ int main(int argc, char** argv)
         use(prime.value);
 
     bool runEncore = true;
+    Poco::Mutex mx;
 
-    KeyStrokeRunnable runnable(&runEncore);
+    KeyStrokeRunnable runnable(&runEncore,&mx);
     Poco::Thread thread;
     thread.start(runnable);
 
-    while(runEncore){
+    while(true){
     	++prime;
+    	mx.lock();
+    	if(!runEncore){
+        	mx.unlock();
+        	break;
+    	}
+    	mx.unlock();
     	if(prime.isPrime()){
     		Prime::primesList.push_back(prime.value);
     		printf("prime number found: %d\n",prime.value);
