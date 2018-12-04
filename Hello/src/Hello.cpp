@@ -27,6 +27,9 @@
 #include "Poco/SQL/SQLite/Connector.h"
 #include <iostream>
 
+#include <cpprest/http_client.h>
+#include <cpprest/filestream.h>
+
 using Poco::Net::ServerSocket;
 using Poco::Net::HTTPRequestHandler;
 using Poco::Net::HTTPRequestHandlerFactory;
@@ -48,6 +51,12 @@ using Poco::Util::HelpFormatter;
 using namespace Poco::SQL::Keywords;
 using Poco::SQL::Session;
 using Poco::SQL::Statement;
+
+using namespace utility;                    // Common utilities like string conversions
+using namespace web;                        // Common features like URIs.
+using namespace web::http;                  // Common HTTP functionality
+using namespace web::http::client;          // HTTP client features
+using namespace concurrency::streams;       // Asynchronous streams
 
 class TimeRequestHandler: public HTTPRequestHandler
 {
@@ -226,73 +235,119 @@ public:
 
 std::vector<int> Prime::primesList;
 
-int main(int argc, char** argv)
+//int main(int argc, char** argv)
+//{
+//    // register SQLite connector
+//    Poco::SQL::SQLite::Connector::registerConnector();
+//
+//    // create a session
+//    Session session("SQLite", "primes.db");
+//
+//    // create table if not exists
+//    session << "CREATE TABLE IF NOT EXISTS Primes (prime INTEGER)", now;
+//
+//    Prime prime;
+//
+//    // a simple query
+//    Statement selectAll(session);
+//    selectAll << "SELECT prime FROM Primes",
+//        into(prime.value),
+//        range(0, 1); //  iterate over result set one row at a time
+//
+//    while (!selectAll.done())
+//    {
+//    	if(selectAll.execute()){
+//        	Prime::primesList.push_back(prime.value);
+//    	}
+//    }
+//
+//    // a simple query
+//    Statement selectMax(session);
+//    selectMax << "SELECT MAX(prime) FROM Primes",
+//        into(prime.value),
+//        range(0, 1); //  iterate over result set one row at a time
+//
+//    while (!selectMax.done())
+//    {
+//    	selectMax.execute();
+//    }
+//
+//
+//    Statement insert(session);
+//    insert << "INSERT INTO Primes VALUES(?)",
+//        use(prime.value);
+//
+//    bool runEncore = true;
+//    Poco::Mutex mx;
+//
+//    KeyStrokeRunnable runnable(&runEncore,&mx);
+//    Poco::Thread thread;
+//    thread.start(runnable);
+//
+//    while(true){
+//    	++prime;
+//    	mx.lock();
+//    	if(!runEncore){
+//        	mx.unlock();
+//        	break;
+//    	}
+//    	mx.unlock();
+//    	if(prime.isPrime()){
+//    		Prime::primesList.push_back(prime.value);
+//    		printf("prime number found: %d\n",prime.value);
+//            insert.execute();
+//    	}
+//    }
+//
+//    thread.join();
+//
+////    HTTPTimeServer app;
+////    return app.run(argc, argv);
+//    return 0;
+//}
+
+int main(int argc, char* argv[])
 {
-    // register SQLite connector
-    Poco::SQL::SQLite::Connector::registerConnector();
+    auto fileStream = std::make_shared<ostream>();
 
-    // create a session
-    Session session("SQLite", "primes.db");
-
-    // create table if not exists
-    session << "CREATE TABLE IF NOT EXISTS Primes (prime INTEGER)", now;
-
-    Prime prime;
-
-    // a simple query
-    Statement selectAll(session);
-    selectAll << "SELECT prime FROM Primes",
-        into(prime.value),
-        range(0, 1); //  iterate over result set one row at a time
-
-    while (!selectAll.done())
+    // Open stream to output file.
+    pplx::task<void> requestTask = fstream::open_ostream(U("results.html")).then([=](ostream outFile)
     {
-    	if(selectAll.execute()){
-        	Prime::primesList.push_back(prime.value);
-    	}
-    }
+        *fileStream = outFile;
 
-    // a simple query
-    Statement selectMax(session);
-    selectMax << "SELECT MAX(prime) FROM Primes",
-        into(prime.value),
-        range(0, 1); //  iterate over result set one row at a time
+        // Create http_client to send the request.
+        http_client client(U("http://www.bing.com/"));
 
-    while (!selectMax.done())
+        // Build request URI and start the request.
+        uri_builder builder(U("/search"));
+        builder.append_query(U("q"), U("cpprestsdk github"));
+        return client.request(methods::GET, builder.to_string());
+    })
+
+    // Handle response headers arriving.
+    .then([=](http_response response)
     {
-    	selectMax.execute();
+        printf("Received response status code:%u\n", response.status_code());
+
+        // Write response body into the file.
+        return response.body().read_to_end(fileStream->streambuf());
+    })
+
+    // Close the file stream.
+    .then([=](size_t)
+    {
+        return fileStream->close();
+    });
+
+    // Wait for all the outstanding I/O to complete and handle any exceptions
+    try
+    {
+        requestTask.wait();
+    }
+    catch (const std::exception &e)
+    {
+        printf("Error exception:%s\n", e.what());
     }
 
-
-    Statement insert(session);
-    insert << "INSERT INTO Primes VALUES(?)",
-        use(prime.value);
-
-    bool runEncore = true;
-    Poco::Mutex mx;
-
-    KeyStrokeRunnable runnable(&runEncore,&mx);
-    Poco::Thread thread;
-    thread.start(runnable);
-
-    while(true){
-    	++prime;
-    	mx.lock();
-    	if(!runEncore){
-        	mx.unlock();
-        	break;
-    	}
-    	mx.unlock();
-    	if(prime.isPrime()){
-    		Prime::primesList.push_back(prime.value);
-    		printf("prime number found: %d\n",prime.value);
-            insert.execute();
-    	}
-    }
-
-    thread.join();
-
-//    HTTPTimeServer app;
-//    return app.run(argc, argv);
     return 0;
 }
