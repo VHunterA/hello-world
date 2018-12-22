@@ -23,12 +23,19 @@
 #include "Poco/Util/Option.h"
 #include "Poco/Util/OptionSet.h"
 #include "Poco/Util/HelpFormatter.h"
-#include "Poco/SQL/Session.h"
-#include "Poco/SQL/SQLite/Connector.h"
+//#include "Poco/SQL/Session.h"
+//#include "Poco/SQL/SQLite/Connector.h"
 #include <iostream>
 
 #include <cpprest/http_client.h>
 #include <cpprest/filestream.h>
+
+#include "Poco/Util/ServerApplication.h"
+#include "Poco/RemotingNG/TCP/Listener.h"
+#include "Poco/RemotingNG/ORB.h"
+#include "TimeService.h"
+#include "TimeServiceServerHelper.h"
+#include <iostream>
 
 using Poco::Net::ServerSocket;
 using Poco::Net::HTTPRequestHandler;
@@ -48,9 +55,9 @@ using Poco::Util::OptionSet;
 using Poco::Util::OptionCallback;
 using Poco::Util::HelpFormatter;
 
-using namespace Poco::SQL::Keywords;
-using Poco::SQL::Session;
-using Poco::SQL::Statement;
+//using namespace Poco::SQL::Keywords;
+//using Poco::SQL::Session;
+//using Poco::SQL::Statement;
 
 using namespace utility;                    // Common utilities like string conversions
 using namespace web;                        // Common features like URIs.
@@ -306,48 +313,76 @@ std::vector<int> Prime::primesList;
 //    return 0;
 //}
 
-int main(int argc, char* argv[])
+//int main(int argc, char* argv[])
+//{
+//    auto fileStream = std::make_shared<ostream>();
+//
+//    // Open stream to output file.
+//    pplx::task<void> requestTask = fstream::open_ostream(U("results.html")).then([=](ostream outFile)
+//    {
+//        *fileStream = outFile;
+//
+//        // Create http_client to send the request.
+//        http_client client(U("http://www.bing.com/"));
+//
+//        // Build request URI and start the request.
+//        uri_builder builder(U("/search"));
+//        builder.append_query(U("q"), U("cpprestsdk github"));
+//        return client.request(methods::GET, builder.to_string());
+//    })
+//
+//    // Handle response headers arriving.
+//    .then([=](http_response response)
+//    {
+//        printf("Received response status code:%u\n", response.status_code());
+//
+//        // Write response body into the file.
+//        return response.body().read_to_end(fileStream->streambuf());
+//    })
+//
+//    // Close the file stream.
+//    .then([=](size_t)
+//    {
+//        return fileStream->close();
+//    });
+//
+//    // Wait for all the outstanding I/O to complete and handle any exceptions
+//    try
+//    {
+//        requestTask.wait();
+//    }
+//    catch (const std::exception &e)
+//    {
+//        printf("Error exception:%s\n", e.what());
+//    }
+//
+//    return 0;
+//}
+
+class TimeServer: public Poco::Util::ServerApplication
 {
-    auto fileStream = std::make_shared<ostream>();
-
-    // Open stream to output file.
-    pplx::task<void> requestTask = fstream::open_ostream(U("results.html")).then([=](ostream outFile)
+    int main(const std::vector<std::string>& args)
     {
-        *fileStream = outFile;
+        // 1. Create and register TCP listener.
+        std::string listener = Poco::RemotingNG::ORB::instance().registerListener(
+            new Poco::RemotingNG::TCP::Listener("localhost:9999")
+        );
 
-        // Create http_client to send the request.
-        http_client client(U("http://www.bing.com/"));
+        // 2. Create the service object.
+        Poco::SharedPtr<Sample::TimeService> pTimeService = new Sample::TimeService;
 
-        // Build request URI and start the request.
-        uri_builder builder(U("/search"));
-        builder.append_query(U("q"), U("cpprestsdk github"));
-        return client.request(methods::GET, builder.to_string());
-    })
+        // 3. Register service object with ORB.
+        std::string uri = Sample::TimeServiceServerHelper::registerObject(pTimeService, "TheTimeService", listener);
+        std::cout << "TimeService URI is: " << uri << std::endl;
 
-    // Handle response headers arriving.
-    .then([=](http_response response)
-    {
-        printf("Received response status code:%u\n", response.status_code());
+        // Wait for CTRL-C or kill.
+        waitForTerminationRequest();
 
-        // Write response body into the file.
-        return response.body().read_to_end(fileStream->streambuf());
-    })
+        // Stop the remoting machinery.
+        Poco::RemotingNG::ORB::instance().shutdown();
 
-    // Close the file stream.
-    .then([=](size_t)
-    {
-        return fileStream->close();
-    });
-
-    // Wait for all the outstanding I/O to complete and handle any exceptions
-    try
-    {
-        requestTask.wait();
+        return Application::EXIT_OK;
     }
-    catch (const std::exception &e)
-    {
-        printf("Error exception:%s\n", e.what());
-    }
+};
 
-    return 0;
-}
+POCO_SERVER_MAIN(TimeServer)

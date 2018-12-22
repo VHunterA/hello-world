@@ -5,7 +5,7 @@
  *      Author: vhunter
  */
 
-#include "../include/TimeService.h"
+#include "TimeService.h"
 
 #include "Poco/DateTime.h"
 #include "Poco/DateTimeFormatter.h"
