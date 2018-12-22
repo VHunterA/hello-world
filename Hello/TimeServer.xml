@@ -1,0 +1,29 @@
+<AppConfig>
+    <RemoteGen>
+        <files>
+            <include>
+                ${POCO_BASE}/include/Poco/RemotingNG/RemoteObject.h
+                ${POCO_BASE}/include/Poco/RemotingNG/Proxy.h
+                ${POCO_BASE}/include/Poco/RemotingNG/Skeleton.h
+                include/TimeService.h
+            </include>
+        </files>
+        <output>
+            <mode>server</mode>
+            <include>include</include>
+            <src>src</src>
+            <namespace>Sample</namespace>
+            <copyright>Copyright (c) 2018</copyright>
+        </output>
+        <compiler>
+            <exec>g++</exec>
+			<options>
+			    -I${POCO_BASE}/include
+			    -I./include
+			    -E
+			    -C
+			    -o%.i
+			</options>
+        </compiler>
+    </RemoteGen>
+</AppConfig>
